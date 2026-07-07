@@ -1,0 +1,29 @@
+groups:
+  - name: claim-system-alerts
+    rules:
+      - alert: HighClaimFailureRate
+        expr: rate(claim_failures_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High claim failure rate detected"
+          description: "Claim failures are above threshold (>0.1/sec) for more than 2 minutes"
+
+      - alert: HighClaimProcessingLatency
+        expr: histogram_quantile(0.95, rate(claim_processing_duration_ms_bucket[5m])) > 2000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High claim processing latency detected"
+          description: "95th percentile claim processing time is above 2000ms for more than 2 minutes"
+
+      - alert: BackendServiceDown
+        expr: up{job="bema-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+          description: "Prometheus cannot scrape bema-backend metrics for more than 1 minute"
