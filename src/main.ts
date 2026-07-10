@@ -2,13 +2,11 @@ import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
-import { startTracing } from "./common/observability/tracing";
 import { loadClaimServiceConfig } from "./common/config/service-config";
 
 async function bootstrap() {
   const config = loadClaimServiceConfig();
 
-  startTracing();
 
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,

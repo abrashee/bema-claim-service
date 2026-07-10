@@ -15,4 +15,4 @@ RUN npm run build
 
 EXPOSE 8083
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node -r ./dist/tracing-register.js dist/main.js"]
