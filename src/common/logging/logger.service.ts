@@ -1,25 +1,110 @@
 // src/common/logging/logger.service.ts
-import { Injectable } from "@nestjs/common";
+import {
+  Injectable,
+  LoggerService as NestLoggerService,
+  LogLevel,
+} from "@nestjs/common";
+
+type LogMetadata = Record<string, unknown>;
 
 @Injectable()
-export class LoggerService {
-  log(message: string, meta?: Record<string, any>) {
-    const safeMeta = meta ? this.sanitize(meta) : undefined;
-    const payload =
-      safeMeta && typeof safeMeta === "object" && !Array.isArray(safeMeta)
-        ? safeMeta
-        : { meta: safeMeta };
+export class LoggerService implements NestLoggerService {
+  log(message: unknown, metaOrContext?: LogMetadata | string) {
+    this.write("log", message, metaOrContext);
+  }
 
-    console.log(
-      JSON.stringify({
-        timestamp: new Date().toISOString(),
-        message,
-        ...payload,
-      }),
-    );
+  error(
+    message: unknown,
+    traceOrMeta?: string | LogMetadata,
+    context?: string,
+  ) {
+    const metadata =
+      traceOrMeta && typeof traceOrMeta === "object"
+        ? traceOrMeta
+        : traceOrMeta
+          ? { stack: traceOrMeta }
+          : undefined;
+
+    this.write("error", message, metadata, context);
+  }
+
+  warn(message: unknown, metaOrContext?: LogMetadata | string) {
+    this.write("warn", message, metaOrContext);
+  }
+
+  debug(message: unknown, metaOrContext?: LogMetadata | string) {
+    this.write("debug", message, metaOrContext);
+  }
+
+  verbose(message: unknown, metaOrContext?: LogMetadata | string) {
+    this.write("verbose", message, metaOrContext);
+  }
+
+  fatal(message: unknown, metaOrContext?: LogMetadata | string) {
+    this.write("fatal", message, metaOrContext);
+  }
+
+  setLogLevels(_levels: LogLevel[]) {
+    // Log-level filtering is controlled by the runtime/container configuration.
+  }
+
+  private write(
+    level: string,
+    message: unknown,
+    metaOrContext?: LogMetadata | string,
+    explicitContext?: string,
+  ) {
+    const context =
+      explicitContext ??
+      (typeof metaOrContext === "string" ? metaOrContext : undefined);
+
+    const metadata =
+      metaOrContext &&
+      typeof metaOrContext === "object" &&
+      !Array.isArray(metaOrContext)
+        ? this.sanitize(metaOrContext)
+        : undefined;
+
+    const payload =
+      metadata && typeof metadata === "object" && !Array.isArray(metadata)
+        ? metadata
+        : metadata === undefined
+          ? {}
+          : { meta: metadata };
+
+    const output = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level,
+      service: "bema-claim-service",
+      message:
+        typeof message === "string"
+          ? message
+          : JSON.stringify(this.sanitize(message)),
+      ...(context ? { context } : {}),
+      ...payload,
+    });
+
+    if (level === "error" || level === "fatal") {
+      console.error(output);
+      return;
+    }
+
+    if (level === "warn") {
+      console.warn(output);
+      return;
+    }
+
+    console.log(output);
   }
 
   private sanitize(value: unknown): unknown {
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: value.message,
+      };
+    }
+
     if (Array.isArray(value)) {
       return value.map((item) => this.sanitize(item));
     }
@@ -39,16 +124,6 @@ export class LoggerService {
             lowered.includes("api_key")
           ) {
             return [key, "[REDACTED]"];
-          }
-
-          if (item instanceof Error) {
-            return [
-              key,
-              {
-                name: item.name,
-                message: item.message,
-              },
-            ];
           }
 
           return [key, this.sanitize(item)];

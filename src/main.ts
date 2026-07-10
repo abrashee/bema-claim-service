@@ -3,6 +3,7 @@ import { NestFactory } from "@nestjs/core";
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
 import { loadClaimServiceConfig } from "./common/config/service-config";
+import { LoggerService } from "./common/logging/logger.service";
 
 async function bootstrap() {
   const config = loadClaimServiceConfig();
@@ -10,8 +11,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
+    bufferLogs: true,
   });
 
+  app.useLogger(app.get(LoggerService));
+  app.flushLogs();
   app.enableShutdownHooks();
   app.useGlobalPipes(
     new ValidationPipe({
