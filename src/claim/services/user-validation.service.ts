@@ -57,7 +57,7 @@ export class UserValidationService {
 
       return exists;
     } catch (error) {
-      this.logger.log("User validation failed (fail-closed mode)", {
+      this.logger.warn("User validation failed (fail-closed mode)", {
         userId,
         error: error instanceof Error ? error.message : String(error),
       });

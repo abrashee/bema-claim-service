@@ -8,6 +8,22 @@ import { CorrelationContextService } from "../correlation/correlation-context.se
 import { trace } from "@opentelemetry/api";
 
 type LogMetadata = Record<string, unknown>;
+type SupportedLogLevel =
+  | "debug"
+  | "verbose"
+  | "log"
+  | "warn"
+  | "error"
+  | "fatal";
+
+const LOG_LEVEL_PRIORITY: Record<SupportedLogLevel, number> = {
+  debug: 10,
+  verbose: 20,
+  log: 30,
+  warn: 40,
+  error: 50,
+  fatal: 60,
+};
 
 @Injectable()
 export class LoggerService implements NestLoggerService {
@@ -55,11 +71,15 @@ export class LoggerService implements NestLoggerService {
   }
 
   private write(
-    level: string,
+    level: SupportedLogLevel,
     message: unknown,
     metaOrContext?: LogMetadata | string,
     explicitContext?: string,
   ) {
+    if (!this.shouldLog(level)) {
+      return;
+    }
+
     const context =
       explicitContext ??
       (typeof metaOrContext === "string" ? metaOrContext : undefined);
@@ -112,6 +132,19 @@ export class LoggerService implements NestLoggerService {
     }
 
     console.log(output);
+  }
+
+  private shouldLog(level: SupportedLogLevel): boolean {
+    const configured = (process.env.LOG_LEVEL ?? "info").toLowerCase();
+    const normalizedConfigured =
+      configured === "info" ? "log" : configured;
+
+    const minimum =
+      LOG_LEVEL_PRIORITY[
+        normalizedConfigured as SupportedLogLevel
+      ] ?? LOG_LEVEL_PRIORITY.log;
+
+    return LOG_LEVEL_PRIORITY[level] >= minimum;
   }
 
   private sanitize(value: unknown): unknown {

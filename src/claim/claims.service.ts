@@ -137,7 +137,7 @@ export class ClaimService {
         throw error;
       }
 
-      this.logger.log("Failed to create claim", {
+      this.logger.error("Failed to create claim", {
         identityId,
         error: error instanceof Error ? error.message : String(error),
       });

@@ -64,7 +64,7 @@ export class FraudWorker implements OnModuleInit, OnModuleDestroy {
         claimStatus === ClaimStatus.APPROVED ||
         claimStatus === ClaimStatus.REJECTED
       ) {
-        this.logger.log("Skipping terminal claim", {
+        this.logger.debug("Skipping terminal claim", {
           claimId,
           status: claimStatus,
         });
@@ -113,7 +113,7 @@ export class FraudWorker implements OnModuleInit, OnModuleDestroy {
       if (canRetry) {
         await this.queue.requeue(payload.claimId);
 
-        this.logger.log("Worker requeued failed claim", {
+        this.logger.warn("Worker requeued failed claim", {
           claimId,
           attempt: retryCount,
           error: error instanceof Error ? error.message : String(error),
@@ -125,7 +125,7 @@ export class FraudWorker implements OnModuleInit, OnModuleDestroy {
 
         await this.queue.moveToDLQ(payload.claimId);
 
-        this.logger.log("Worker moved claim to DLQ", {
+        this.logger.error("Worker moved claim to DLQ", {
           claimId,
           attempts: retryCount,
           error: error instanceof Error ? error.message : String(error),
