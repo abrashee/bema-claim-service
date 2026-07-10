@@ -9,6 +9,8 @@ export class MetricsService {
   public readonly httpRequestsTotal: client.Counter<string>;
   public readonly claimFailuresTotal: client.Counter<string>;
   public readonly claimProcessingDuration: client.Histogram<string>;
+  public readonly claimsCreatedTotal: client.Counter<string>;
+  public readonly claimStatusTransitionsTotal: client.Counter<string>;
 
   constructor() {
     client.collectDefaultMetrics({ register: this.registry });
@@ -31,6 +33,19 @@ export class MetricsService {
       name: "claim_processing_duration_ms",
       help: "Time taken to process claims",
       buckets: [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+      registers: [this.registry],
+    });
+
+    this.claimsCreatedTotal = new client.Counter({
+      name: "claims_created_total",
+      help: "Total claims successfully created",
+      registers: [this.registry],
+    });
+
+    this.claimStatusTransitionsTotal = new client.Counter({
+      name: "claim_status_transitions_total",
+      help: "Total successful claim status transitions",
+      labelNames: ["from", "to"],
       registers: [this.registry],
     });
   }

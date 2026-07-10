@@ -42,6 +42,8 @@ describe("ClaimService", () => {
     {
       claimFailuresTotal: { inc: jest.fn() },
       claimProcessingDuration: { observe: jest.fn() },
+      claimsCreatedTotal: { inc: jest.fn() },
+      claimStatusTransitionsTotal: { inc: jest.fn() },
     } as any,
     queue,
     { emit: jest.fn() } as any,

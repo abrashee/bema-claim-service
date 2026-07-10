@@ -116,6 +116,8 @@ export class ClaimService {
 
       await this.idempotency.finalize(key, claimId);
 
+      this.metrics.claimsCreatedTotal.inc();
+
       return {
         data: claim,
         message: "Claim created successfully",
@@ -213,6 +215,11 @@ export class ClaimService {
 
     const newClaim = await this.prisma.claim.findUnique({
       where: { id },
+    });
+
+    this.metrics.claimStatusTransitionsTotal.inc({
+      from: current.status,
+      to: nextStatus,
     });
 
     this.events.emit<ClaimStatusChangedEvent>(CLAIM_EVENTS.STATUS_CHANGED, {
