@@ -5,6 +5,7 @@ import {
   LogLevel,
 } from "@nestjs/common";
 import { CorrelationContextService } from "../correlation/correlation-context.service";
+import { trace } from "@opentelemetry/api";
 
 type LogMetadata = Record<string, unknown>;
 
@@ -77,10 +78,18 @@ export class LoggerService implements NestLoggerService {
           ? {}
           : { meta: metadata };
 
+    const activeSpanContext = trace.getActiveSpan()?.spanContext();
+
     const output = JSON.stringify({
       timestamp: new Date().toISOString(),
       level,
       service: "bema-claim-service",
+      ...(activeSpanContext?.isRemote === false || activeSpanContext
+        ? {
+            traceId: activeSpanContext.traceId,
+            spanId: activeSpanContext.spanId,
+          }
+        : {}),
       ...(this.correlationContext.getCorrelationId()
         ? { correlationId: this.correlationContext.getCorrelationId() }
         : {}),
