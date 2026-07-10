@@ -7,6 +7,7 @@ import { LoggingModule } from "./common/logging/logging.module";
 import { DatabaseModule } from "./common/database/database.module";
 import { ObservabilityModule } from "./common/observability/observability.module";
 import { DomainEventModule } from "./common/events/domain-event.module";
+import { CorrelationModule } from "./common/correlation/correlation.module";
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { DomainEventModule } from "./common/events/domain-event.module";
     DatabaseModule,
     ObservabilityModule,
     DomainEventModule,
+    CorrelationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -13,6 +13,7 @@ import { LoggerService } from "../../common/logging/logger.service";
 import { UserCacheService } from "./user-cache.service";
 import { MetricsService } from "../../common/observability/metrics.service";
 import { getClaimServiceConfig } from "../../common/config/service-config";
+import { CorrelationContextService } from "../../common/correlation/correlation-context.service";
 
 @Injectable()
 export class UserValidationService {
@@ -21,6 +22,7 @@ export class UserValidationService {
     private readonly logger: LoggerService,
     private readonly cache: UserCacheService,
     private readonly metrics: MetricsService,
+    private readonly correlationContext: CorrelationContextService,
   ) {}
 
   async validateUserExists(userId: string): Promise<boolean> {
@@ -37,6 +39,14 @@ export class UserValidationService {
         `${config.userServiceUrl}/api/v1/users/${encodeURIComponent(userId)}`,
         {
           timeout: 3000,
+          headers: {
+            ...(this.correlationContext.getCorrelationId()
+              ? {
+                  "X-Correlation-ID":
+                    this.correlationContext.getCorrelationId(),
+                }
+              : {}),
+          },
           validateStatus: (status) => status >= 200 && status < 500,
         },
       );

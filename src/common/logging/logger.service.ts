@@ -4,11 +4,16 @@ import {
   LoggerService as NestLoggerService,
   LogLevel,
 } from "@nestjs/common";
+import { CorrelationContextService } from "../correlation/correlation-context.service";
 
 type LogMetadata = Record<string, unknown>;
 
 @Injectable()
 export class LoggerService implements NestLoggerService {
+  constructor(
+    private readonly correlationContext: CorrelationContextService,
+  ) {}
+
   log(message: unknown, metaOrContext?: LogMetadata | string) {
     this.write("log", message, metaOrContext);
   }
@@ -76,6 +81,9 @@ export class LoggerService implements NestLoggerService {
       timestamp: new Date().toISOString(),
       level,
       service: "bema-claim-service",
+      ...(this.correlationContext.getCorrelationId()
+        ? { correlationId: this.correlationContext.getCorrelationId() }
+        : {}),
       message:
         typeof message === "string"
           ? message
