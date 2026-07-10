@@ -15,6 +15,7 @@ import {
 import { ConnectedSocket, MessageBody, WsException } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
 import { OnEvent } from "@nestjs/event-emitter";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import {
   CLAIM_EVENTS,
   ClaimStatusChangedEvent,
@@ -39,14 +40,33 @@ export class ClaimGateway implements OnGatewayConnection {
   ) {}
 
   handleConnection(client: Socket) {
-    try {
-      const token = this.extractToken(client);
-      const verified = this.jwtTokenService.verifyToken(token);
+    const tracer = trace.getTracer("claim-websocket");
 
-      client.data.identityId = verified.userId;
-    } catch {
-      client.disconnect(true);
-    }
+    tracer.startActiveSpan("websocket.connect", (span) => {
+      span.setAttribute("messaging.system", "socket.io");
+      span.setAttribute("messaging.operation", "connect");
+      span.setAttribute("network.peer.address", client.handshake.address);
+
+      try {
+        const token = this.extractToken(client);
+        const verified = this.jwtTokenService.verifyToken(token);
+
+        client.data.identityId = verified.userId;
+        span.setAttribute("enduser.id", verified.userId);
+        span.setStatus({ code: SpanStatusCode.OK });
+      } catch (error) {
+        span.recordException(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "WebSocket authentication failed",
+        });
+        client.disconnect(true);
+      } finally {
+        span.end();
+      }
+    });
   }
 
   @SubscribeMessage("join-claim-room")
@@ -54,26 +74,77 @@ export class ClaimGateway implements OnGatewayConnection {
     @ConnectedSocket() client: Socket,
     @MessageBody() claimId: string,
   ) {
-    try {
-      const identityId = this.getIdentityId(client);
-      await this.claimService.getClaim(claimId, identityId);
-      client.join(claimId);
+    const tracer = trace.getTracer("claim-websocket");
 
-      return {
-        joined: claimId,
-      };
-    } catch {
-      throw new WsException("Unauthorized");
-    }
+    return tracer.startActiveSpan("websocket.join_claim_room", async (span) => {
+      span.setAttribute("messaging.system", "socket.io");
+      span.setAttribute("messaging.operation", "receive");
+      span.setAttribute("messaging.destination.name", "join-claim-room");
+      span.setAttribute("claim.id", claimId);
+
+      try {
+        const identityId = this.getIdentityId(client);
+        span.setAttribute("enduser.id", identityId);
+
+        await this.claimService.getClaim(claimId, identityId);
+        await client.join(claimId);
+
+        span.setStatus({ code: SpanStatusCode.OK });
+
+        return {
+          joined: claimId,
+        };
+      } catch (error) {
+        span.recordException(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "Claim room authorization failed",
+        });
+
+        throw new WsException("Unauthorized");
+      } finally {
+        span.end();
+      }
+    });
   }
 
   @OnEvent(CLAIM_EVENTS.STATUS_CHANGED)
   handleClaimStatusChanged(payload: ClaimStatusChangedEvent) {
-    this.server.to(payload.claimId).emit("claim-updated", {
-      claimId: payload.claimId,
-      status: payload.status,
-      updatedAt: payload.updatedAt,
-      traceId: payload.traceId,
+    const tracer = trace.getTracer("claim-websocket");
+
+    tracer.startActiveSpan("websocket.emit_claim_updated", (span) => {
+      span.setAttribute("messaging.system", "socket.io");
+      span.setAttribute("messaging.operation", "publish");
+      span.setAttribute("messaging.destination.name", "claim-updated");
+      span.setAttribute("claim.id", payload.claimId);
+      span.setAttribute("claim.status", payload.status);
+
+      try {
+        const traceId = span.spanContext().traceId;
+
+        this.server.to(payload.claimId).emit("claim-updated", {
+          claimId: payload.claimId,
+          status: payload.status,
+          updatedAt: payload.updatedAt,
+          traceId,
+        });
+
+        span.setStatus({ code: SpanStatusCode.OK });
+      } catch (error) {
+        span.recordException(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "Claim update delivery failed",
+        });
+
+        throw error;
+      } finally {
+        span.end();
+      }
     });
   }
 
