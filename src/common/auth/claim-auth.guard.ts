@@ -11,6 +11,7 @@ import { IS_PUBLIC_KEY } from "./public.decorator";
 
 export interface AuthenticatedClaimRequest extends Request {
   identityId?: string;
+  role?: "USER" | "ADMIN";
 }
 
 @Injectable()
@@ -41,6 +42,7 @@ export class ClaimAuthGuard implements CanActivate {
     }
 
     request.identityId = verifiedToken.userId;
+    request.role = verifiedToken.role;
 
     return true;
   }

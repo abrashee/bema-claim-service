@@ -52,7 +52,9 @@ export class ClaimGateway implements OnGatewayConnection {
         const verified = await this.jwtTokenService.verifyToken(token);
 
         client.data.identityId = verified.userId;
+        client.data.role = verified.role;
         span.setAttribute("enduser.id", verified.userId);
+        span.setAttribute("enduser.role", verified.role);
         span.setStatus({ code: SpanStatusCode.OK });
       } catch (error) {
         span.recordException(

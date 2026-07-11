@@ -11,6 +11,7 @@ interface JwtHeader {
 interface JwtPayload {
   jti?: string;
   sub?: string;
+  role?: string;
   exp?: number;
   iat?: number;
   [key: string]: unknown;
@@ -19,6 +20,7 @@ interface JwtPayload {
 export interface VerifiedToken {
   tokenId: string;
   userId: string;
+  role: "USER" | "ADMIN";
   payload: JwtPayload;
 }
 
@@ -80,6 +82,10 @@ export class JwtTokenService {
       throw new UnauthorizedException("Invalid authorization token");
     }
 
+    if (payload.role !== "USER" && payload.role !== "ADMIN") {
+      throw new UnauthorizedException("Invalid authorization token");
+    }
+
     if (typeof payload.exp === "number") {
       const expiresAt = payload.exp * 1000;
 
@@ -95,6 +101,7 @@ export class JwtTokenService {
     return {
       tokenId: payload.jti,
       userId: payload.sub,
+      role: payload.role,
       payload,
     };
   }

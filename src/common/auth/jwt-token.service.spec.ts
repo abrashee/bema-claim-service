@@ -53,6 +53,7 @@ describe("JwtTokenService", () => {
     const token = createToken({
       jti: "token-123",
       sub: "user-123",
+      role: "USER",
       exp: Math.floor(Date.now() / 1000) + 60,
     });
 
@@ -71,12 +72,27 @@ describe("JwtTokenService", () => {
     const token = createToken({
       jti: "revoked-token",
       sub: "user-123",
+      role: "USER",
       exp: Math.floor(Date.now() / 1000) + 60,
     });
 
     await expect(tokenService.verifyToken(token)).rejects.toThrow(
       "Token revoked",
     );
+  });
+
+  it("rejects a token without a role", async () => {
+    const token = createToken({
+      jti: "token-123",
+      sub: "user-123",
+      exp: Math.floor(Date.now() / 1000) + 60,
+    });
+
+    await expect(tokenService.verifyToken(token)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+
+    expect(accessTokenRevocationService.isRevoked).not.toHaveBeenCalled();
   });
 
   it("rejects a token without a jti", async () => {
@@ -115,6 +131,7 @@ describe("JwtTokenService", () => {
     const token = createToken({
       jti: "expired-token",
       sub: "user-123",
+      role: "USER",
       exp: Math.floor(Date.now() / 1000) - 60,
     });
 
