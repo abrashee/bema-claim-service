@@ -1,6 +1,7 @@
 import {
   ArgumentsHost,
   BadRequestException,
+  NotFoundException,
   HttpStatus,
 } from "@nestjs/common";
 import { GlobalHttpExceptionFilter } from "./global-http-exception.filter";
@@ -44,6 +45,18 @@ describe("GlobalHttpExceptionFilter", () => {
     expect(json).toHaveBeenCalledWith({
       statusCode: HttpStatus.BAD_REQUEST,
       message: "Invalid request",
+      data: null,
+    });
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("maps missing claims to not found", () => {
+    filter.catch(new NotFoundException("Claim not found"), host);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+    expect(json).toHaveBeenCalledWith({
+      statusCode: HttpStatus.NOT_FOUND,
+      message: "Claim not found",
       data: null,
     });
     expect(logger.error).not.toHaveBeenCalled();
