@@ -24,12 +24,14 @@ describe("JwtTokenService", () => {
     const header = Buffer.from(
       JSON.stringify({ alg: "HS256", typ: "JWT" }),
     ).toString("base64url");
+
     const payload = Buffer.from(
       JSON.stringify({
         sub: "user-123",
         exp: Math.floor(Date.now() / 1000) + 60,
       }),
     ).toString("base64url");
+
     const signature = createHmac("sha256", secret)
       .update(`${header}.${payload}`)
       .digest("base64url");
@@ -45,12 +47,15 @@ describe("JwtTokenService", () => {
     const header = Buffer.from(
       JSON.stringify({ alg: "HS256", typ: "JWT" }),
     ).toString("base64url");
-    const payload = Buffer.from(JSON.stringify({ sub: "user-123" })).toString(
-      "base64url",
-    );
+
+    const payload = Buffer.from(
+      JSON.stringify({ sub: "user-123" }),
+    ).toString("base64url");
+
     const signature = createHmac("sha256", secret)
       .update(`${header}.${payload}`)
       .digest("base64url");
+
     const tamperedPayload = Buffer.from(
       JSON.stringify({ sub: "user-456" }),
     ).toString("base64url");
@@ -58,5 +63,26 @@ describe("JwtTokenService", () => {
     expect(() =>
       tokenService.verifyToken(`${header}.${tamperedPayload}.${signature}`),
     ).toThrow(UnauthorizedException);
+  });
+
+  it("rejects an expired token", () => {
+    const header = Buffer.from(
+      JSON.stringify({ alg: "HS256", typ: "JWT" }),
+    ).toString("base64url");
+
+    const payload = Buffer.from(
+      JSON.stringify({
+        sub: "user-123",
+        exp: Math.floor(Date.now() / 1000) - 60,
+      }),
+    ).toString("base64url");
+
+    const signature = createHmac("sha256", secret)
+      .update(`${header}.${payload}`)
+      .digest("base64url");
+
+    expect(() =>
+      tokenService.verifyToken(`${header}.${payload}.${signature}`),
+    ).toThrow("Token expired");
   });
 });
