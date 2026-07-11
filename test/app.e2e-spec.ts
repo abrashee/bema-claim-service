@@ -2,6 +2,7 @@ import { INestApplication } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
 import { AppController } from "../src/app.controller";
+import { GlobalHttpExceptionFilter } from "../src/common/exceptions/global-http-exception.filter";
 
 describe("AppController (e2e)", () => {
   let app: INestApplication;
@@ -12,7 +13,18 @@ describe("AppController (e2e)", () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalFilters(
+      new GlobalHttpExceptionFilter({
+        error: jest.fn(),
+      } as any),
+    );
     await app.init();
+  });
+
+  it("/ (POST) returns 405", () => {
+    return request(app.getHttpServer())
+      .post("/")
+      .expect(405);
   });
 
   it("/ (GET)", () => {

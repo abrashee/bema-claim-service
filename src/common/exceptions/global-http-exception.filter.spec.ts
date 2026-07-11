@@ -15,6 +15,7 @@ describe("GlobalHttpExceptionFilter", () => {
 
   const request = {
     method: "GET",
+    path: "/api/claims/test",
     originalUrl: "/api/claims/test",
     url: "/api/claims/test",
   };
@@ -36,6 +37,10 @@ describe("GlobalHttpExceptionFilter", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     status.mockReturnValue(response);
+    request.method = "GET";
+    request.path = "/api/claims/test";
+    request.originalUrl = "/api/claims/test";
+    request.url = "/api/claims/test";
   });
 
   it("preserves intentional HTTP exceptions", () => {
@@ -48,6 +53,22 @@ describe("GlobalHttpExceptionFilter", () => {
       data: null,
     });
     expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("maps unsupported methods on known routes to 405", () => {
+    request.method = "POST";
+    request.path = "/";
+    request.originalUrl = "/";
+    request.url = "/";
+
+    filter.catch(new NotFoundException("Cannot POST /"), host);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.METHOD_NOT_ALLOWED);
+    expect(json).toHaveBeenCalledWith({
+      statusCode: HttpStatus.METHOD_NOT_ALLOWED,
+      message: "Method not allowed",
+      data: null,
+    });
   });
 
   it("maps missing claims to not found", () => {
