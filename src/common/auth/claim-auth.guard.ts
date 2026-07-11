@@ -20,7 +20,7 @@ export class ClaimAuthGuard implements CanActivate {
     private readonly jwtTokenService: JwtTokenService,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -34,7 +34,7 @@ export class ClaimAuthGuard implements CanActivate {
       .switchToHttp()
       .getRequest<AuthenticatedClaimRequest>();
     const authorization = request.headers.authorization;
-    const verifiedToken = this.jwtTokenService.verifyBearerToken(authorization);
+    const verifiedToken = await this.jwtTokenService.verifyBearerToken(authorization);
 
     if (!verifiedToken.userId) {
       throw new UnauthorizedException("Invalid authorization token");

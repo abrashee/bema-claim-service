@@ -11,6 +11,7 @@ import { DomainEventModule } from "../common/events/domain-event.module";
 import { DatabaseModule } from "../common/database/database.module";
 import { ClaimAuthGuard } from "../common/auth/claim-auth.guard";
 import { JwtTokenService } from "../common/auth/jwt-token.service";
+import { AccessTokenRevocationService } from "../common/auth/access-token-revocation.service";
 import { ClaimRateLimitService } from "../common/rate-limiting/claim-rate-limit.service";
 import { ClaimIdempotencyService } from "../common/idempotency/claim-idempotency.service";
 
@@ -28,6 +29,7 @@ import { ClaimIdempotencyService } from "../common/idempotency/claim-idempotency
     FraudWorker,
     ClaimGateway,
     ClaimAuthGuard,
+    AccessTokenRevocationService,
     JwtTokenService,
     ClaimRateLimitService,
     ClaimIdempotencyService,

@@ -39,17 +39,17 @@ export class ClaimGateway implements OnGatewayConnection {
     private readonly jwtTokenService: JwtTokenService,
   ) {}
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket): Promise<void> {
     const tracer = trace.getTracer("claim-websocket");
 
-    tracer.startActiveSpan("websocket.connect", (span) => {
+    await tracer.startActiveSpan("websocket.connect", async (span) => {
       span.setAttribute("messaging.system", "socket.io");
       span.setAttribute("messaging.operation", "connect");
       span.setAttribute("network.peer.address", client.handshake.address);
 
       try {
         const token = this.extractToken(client);
-        const verified = this.jwtTokenService.verifyToken(token);
+        const verified = await this.jwtTokenService.verifyToken(token);
 
         client.data.identityId = verified.userId;
         span.setAttribute("enduser.id", verified.userId);

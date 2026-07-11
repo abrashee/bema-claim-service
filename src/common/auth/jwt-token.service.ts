@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { createHmac, timingSafeEqual } from "crypto";
 import { getClaimServiceConfig } from "../config/service-config";
+import { AccessTokenRevocationService } from "./access-token-revocation.service";
 
 interface JwtHeader {
   alg?: string;
@@ -8,6 +9,7 @@ interface JwtHeader {
 }
 
 interface JwtPayload {
+  jti?: string;
   sub?: string;
   exp?: number;
   iat?: number;
@@ -15,19 +17,26 @@ interface JwtPayload {
 }
 
 export interface VerifiedToken {
+  tokenId: string;
   userId: string;
   payload: JwtPayload;
 }
 
 @Injectable()
 export class JwtTokenService {
-  verifyBearerToken(authorizationHeader: string | undefined): VerifiedToken {
+  constructor(
+    private readonly accessTokenRevocationService: AccessTokenRevocationService,
+  ) {}
+
+  async verifyBearerToken(
+    authorizationHeader: string | undefined,
+  ): Promise<VerifiedToken> {
     const token = this.extractToken(authorizationHeader);
 
     return this.verifyToken(token);
   }
 
-  verifyToken(token: string): VerifiedToken {
+  async verifyToken(token: string): Promise<VerifiedToken> {
     const [encodedHeader, encodedPayload, encodedSignature] = token.split(".");
 
     if (!encodedHeader || !encodedPayload || !encodedSignature) {
@@ -67,6 +76,10 @@ export class JwtTokenService {
       throw new UnauthorizedException("Invalid authorization token");
     }
 
+    if (typeof payload.jti !== "string" || payload.jti.trim().length === 0) {
+      throw new UnauthorizedException("Invalid authorization token");
+    }
+
     if (typeof payload.exp === "number") {
       const expiresAt = payload.exp * 1000;
 
@@ -75,7 +88,12 @@ export class JwtTokenService {
       }
     }
 
+    if (await this.accessTokenRevocationService.isRevoked(payload.jti)) {
+      throw new UnauthorizedException("Token revoked");
+    }
+
     return {
+      tokenId: payload.jti,
       userId: payload.sub,
       payload,
     };
