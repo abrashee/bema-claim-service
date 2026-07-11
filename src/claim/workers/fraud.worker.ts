@@ -56,7 +56,8 @@ export class FraudWorker implements OnModuleInit, OnModuleDestroy {
     const start = Date.now();
 
     try {
-      const claimResponse = await this.claimService.getClaim(claimId);
+      const claimResponse =
+        await this.claimService.getClaimInternal(claimId);
       const claim = claimResponse.data;
       const claimStatus = claim.status as ClaimStatus;
 

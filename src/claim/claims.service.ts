@@ -146,9 +146,12 @@ export class ClaimService {
     }
   }
 
-  async getClaim(id: string, identityId?: string) {
+  async getClaim(id: string, identityId: string) {
     const claim = await this.prisma.claim.findFirst({
-      where: identityId ? { id, identityId } : { id },
+      where: {
+        id,
+        identityId,
+      },
     });
 
     if (!claim) {
@@ -161,9 +164,24 @@ export class ClaimService {
     };
   }
 
-  async getAllClaims(identityId?: string) {
+  async getClaimInternal(id: string) {
+    const claim = await this.prisma.claim.findUnique({
+      where: { id },
+    });
+
+    if (!claim) {
+      throw new NotFoundException("Claim not found");
+    }
+
+    return {
+      data: claim,
+      message: "Claim fetched successfully",
+    };
+  }
+
+  async getAllClaims(identityId: string) {
     return this.prisma.claim.findMany({
-      where: identityId ? { identityId } : undefined,
+      where: { identityId },
       orderBy: {
         createdAt: "desc",
       },
