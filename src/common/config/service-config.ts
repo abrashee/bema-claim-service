@@ -74,7 +74,29 @@ function parseOrigin(value: string | undefined, fallback: string): string {
     throw new Error("CORS origin must not be a wildcard");
   }
 
-  return origin;
+  let parsed: URL;
+
+  try {
+    parsed = new URL(origin);
+  } catch {
+    throw new Error("CORS origin must be a valid HTTP or HTTPS origin");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("CORS origin must use HTTP or HTTPS");
+  }
+
+  if (
+    parsed.username ||
+    parsed.password ||
+    parsed.pathname !== "/" ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error("CORS origin must not contain credentials, a path, query, or fragment");
+  }
+
+  return parsed.origin;
 }
 
 export function loadClaimServiceConfig(): ClaimServiceConfig {
@@ -117,6 +139,16 @@ export function getClaimServiceConfig(): ClaimServiceConfig {
   }
 
   return cachedConfig;
+}
+
+export function isAllowedWebSocketOrigin(
+  requestOrigin: string | undefined,
+): boolean {
+  if (typeof requestOrigin !== "string" || requestOrigin.length === 0) {
+    return false;
+  }
+
+  return requestOrigin === getClaimServiceConfig().websocketOrigin;
 }
 
 export function resetClaimServiceConfig(): void {

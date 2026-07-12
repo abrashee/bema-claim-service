@@ -23,12 +23,21 @@ import {
 } from "../../common/events/claim.events";
 import { ClaimService } from "../claims.service";
 import { JwtTokenService } from "../../common/auth/jwt-token.service";
-import { getClaimServiceConfig } from "../../common/config/service-config";
+import {
+  getClaimServiceConfig,
+  isAllowedWebSocketOrigin,
+} from "../../common/config/service-config";
 
 @WebSocketGateway({
   cors: {
     origin: getClaimServiceConfig().websocketOrigin,
     credentials: false,
+  },
+  allowRequest: (request, callback) => {
+    callback(
+      null,
+      isAllowedWebSocketOrigin(request.headers.origin),
+    );
   },
 })
 export class ClaimGateway implements OnGatewayInit, OnGatewayConnection {
