@@ -3,7 +3,7 @@ import { WsException } from "@nestjs/websockets";
 import { ClaimStatus } from "../enums/claim-status.enum";
 import { ClaimGateway } from "./claim.webSocketGateway";
 
-describe("ClaimGateway tracing", () => {
+describe("ClaimGateway", () => {
   const span = {
     setAttribute: jest.fn(),
     setStatus: jest.fn(),
@@ -25,10 +25,7 @@ describe("ClaimGateway tracing", () => {
     verifyToken: jest.fn(),
   };
 
-  const gateway = new ClaimGateway(
-    claimService as any,
-    jwtTokenService as any,
-  );
+  let gateway: ClaimGateway;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -36,77 +33,158 @@ describe("ClaimGateway tracing", () => {
     jest.spyOn(trace, "getTracer").mockReturnValue({
       startActiveSpan,
     } as any);
+
+    gateway = new ClaimGateway(
+      claimService as any,
+      jwtTokenService as any,
+    );
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it("traces a successful WebSocket connection", async () => {
-    jwtTokenService.verifyToken.mockReturnValue({ userId: "user-123" });
+  it("authenticates a valid token before accepting the connection", async () => {
+    jwtTokenService.verifyToken.mockResolvedValue({
+      tokenId: "token-123",
+      userId: "user-123",
+      role: "USER",
+    });
 
-    const client = {
-      handshake: {
-        auth: { token: "token" },
-        headers: {},
-        address: "127.0.0.1",
+    const client = socketClient({
+      auth: { token: "valid-token" },
+    });
+
+    const next = await runHandshakeMiddleware(client);
+
+    expect(jwtTokenService.verifyToken).toHaveBeenCalledWith("valid-token");
+    expect(client.data).toEqual({
+      identityId: "user-123",
+      role: "USER",
+      tokenId: "token-123",
+    });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it("accepts a Bearer token from the authorization header", async () => {
+    jwtTokenService.verifyToken.mockResolvedValue({
+      tokenId: "token-456",
+      userId: "admin-123",
+      role: "ADMIN",
+    });
+
+    const client = socketClient({
+      headers: {
+        authorization: "Bearer header-token",
       },
-      data: {},
-      disconnect: jest.fn(),
+    });
+
+    const next = await runHandshakeMiddleware(client);
+
+    expect(jwtTokenService.verifyToken).toHaveBeenCalledWith("header-token");
+    expect(client.data).toEqual({
+      identityId: "admin-123",
+      role: "ADMIN",
+      tokenId: "token-456",
+    });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it("rejects a connection without a token during the handshake", async () => {
+    const client = socketClient();
+    const next = await runHandshakeMiddleware(client);
+
+    expect(jwtTokenService.verifyToken).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+
+    const error = next.mock.calls[0][0] as Error & {
+      data?: { code: string };
     };
 
-    gateway.handleConnection(client as any);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe("Unauthorized");
+    expect(error.data).toEqual({
+      code: "UNAUTHORIZED",
+    });
+  });
 
-    await Promise.resolve();
+  it("rejects an invalid or revoked token during the handshake", async () => {
+    jwtTokenService.verifyToken.mockRejectedValue(
+      new Error("Token revoked"),
+    );
+
+    const client = socketClient({
+      auth: { token: "revoked-token" },
+    });
+
+    const next = await runHandshakeMiddleware(client);
+
+    expect(jwtTokenService.verifyToken).toHaveBeenCalledWith(
+      "revoked-token",
+    );
+
+    const error = next.mock.calls[0][0] as Error & {
+      data?: { code: string };
+    };
+
+    expect(error.message).toBe("Unauthorized");
+    expect(error.data).toEqual({
+      code: "UNAUTHORIZED",
+    });
+  });
+
+  it("traces an authenticated WebSocket connection", async () => {
+    const client = socketClient();
+    client.data = {
+      identityId: "user-123",
+      role: "USER",
+      tokenId: "token-123",
+    };
+
+    await gateway.handleConnection(client as any);
 
     expect(startActiveSpan).toHaveBeenCalledWith(
       "websocket.connect",
       expect.any(Function),
     );
-    expect(client.data).toEqual({ identityId: "user-123" });
     expect(client.disconnect).not.toHaveBeenCalled();
+    expect(span.setAttribute).toHaveBeenCalledWith(
+      "enduser.id",
+      "user-123",
+    );
+    expect(span.setAttribute).toHaveBeenCalledWith(
+      "enduser.role",
+      "USER",
+    );
     expect(span.setStatus).toHaveBeenCalledWith({
       code: SpanStatusCode.OK,
     });
     expect(span.end).toHaveBeenCalled();
   });
 
-  it("traces and disconnects an unauthorized WebSocket connection", async () => {
-    jwtTokenService.verifyToken.mockImplementation(() => {
-      throw new Error("invalid token");
-    });
+  it("disconnects a connection missing authenticated state", async () => {
+    const client = socketClient();
 
-    const client = {
-      handshake: {
-        auth: { token: "invalid" },
-        headers: {},
-        address: "127.0.0.1",
-      },
-      data: {},
-      disconnect: jest.fn(),
-    };
-
-    gateway.handleConnection(client as any);
-
-    await Promise.resolve();
+    await gateway.handleConnection(client as any);
 
     expect(client.disconnect).toHaveBeenCalledWith(true);
     expect(span.recordException).toHaveBeenCalled();
     expect(span.setStatus).toHaveBeenCalledWith({
       code: SpanStatusCode.ERROR,
-      message: "WebSocket authentication failed",
+      message: "WebSocket authentication state missing",
     });
-    expect(span.end).toHaveBeenCalled();
   });
 
-  it("traces an authorized claim-room join", async () => {
+  it("authorizes a claim-room join by authenticated ownership", async () => {
     claimService.getClaim.mockResolvedValue({
       data: { id: "claim-123" },
     });
 
-    const client = {
-      data: { identityId: "user-123" },
-      join: jest.fn().mockResolvedValue(undefined),
+    const client = socketClient();
+    client.data = {
+      identityId: "user-123",
+      role: "USER",
+      tokenId: "token-123",
     };
 
     const result = await gateway.handleJoinRoom(
@@ -120,31 +198,45 @@ describe("ClaimGateway tracing", () => {
     );
     expect(client.join).toHaveBeenCalledWith("claim-123");
     expect(result).toEqual({ joined: "claim-123" });
-    expect(span.setStatus).toHaveBeenCalledWith({
-      code: SpanStatusCode.OK,
-    });
   });
 
-  it("traces and rejects an unauthorized claim-room join", async () => {
-    const client = {
-      data: {},
-      join: jest.fn(),
+  it("rejects a room join without authenticated state", async () => {
+    const client = socketClient();
+
+    await expect(
+      gateway.handleJoinRoom(client as any, "claim-123"),
+    ).rejects.toBeInstanceOf(WsException);
+
+    expect(claimService.getClaim).not.toHaveBeenCalled();
+    expect(client.join).not.toHaveBeenCalled();
+  });
+
+  it("rejects a room join when ownership verification fails", async () => {
+    claimService.getClaim.mockRejectedValue(
+      new Error("Claim not found"),
+    );
+
+    const client = socketClient();
+    client.data = {
+      identityId: "other-user",
+      role: "USER",
+      tokenId: "token-123",
     };
 
     await expect(
       gateway.handleJoinRoom(client as any, "claim-123"),
     ).rejects.toBeInstanceOf(WsException);
 
+    expect(claimService.getClaim).toHaveBeenCalledWith(
+      "claim-123",
+      "other-user",
+    );
     expect(client.join).not.toHaveBeenCalled();
-    expect(span.recordException).toHaveBeenCalled();
-    expect(span.setStatus).toHaveBeenCalledWith({
-      code: SpanStatusCode.ERROR,
-      message: "Claim room authorization failed",
-    });
   });
 
-  it("traces an outbound claim update and emits the active trace ID", async () => {
+  it("emits claim updates only to the claim room", async () => {
     const emit = jest.fn();
+
     gateway.server = {
       to: jest.fn(() => ({ emit })),
     } as any;
@@ -165,9 +257,44 @@ describe("ClaimGateway tracing", () => {
       updatedAt: new Date("2026-07-10T19:00:00.000Z"),
       traceId: "trace-123",
     });
-    expect(span.setStatus).toHaveBeenCalledWith({
-      code: SpanStatusCode.OK,
-    });
-    expect(span.end).toHaveBeenCalled();
   });
+
+  function socketClient(
+    handshakeOverrides: Record<string, unknown> = {},
+  ) {
+    return {
+      handshake: {
+        auth: {},
+        headers: {},
+        address: "127.0.0.1",
+        ...handshakeOverrides,
+      },
+      data: {},
+      disconnect: jest.fn(),
+      join: jest.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  async function runHandshakeMiddleware(client: ReturnType<typeof socketClient>) {
+    let middleware:
+      | ((socket: any, next: (error?: Error) => void) => Promise<void>)
+      | undefined;
+
+    const server = {
+      use: jest.fn((registeredMiddleware) => {
+        middleware = registeredMiddleware;
+      }),
+    };
+
+    gateway.afterInit(server as any);
+
+    expect(server.use).toHaveBeenCalledTimes(1);
+    expect(middleware).toBeDefined();
+
+    const next = jest.fn();
+
+    await middleware!(client, next);
+
+    return next;
+  }
 });

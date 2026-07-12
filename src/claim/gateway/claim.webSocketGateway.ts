@@ -7,10 +7,11 @@
  */
 
 import {
+  OnGatewayConnection,
+  OnGatewayInit,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  SubscribeMessage,
-  OnGatewayConnection,
 } from "@nestjs/websockets";
 import { ConnectedSocket, MessageBody, WsException } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
@@ -30,7 +31,7 @@ import { getClaimServiceConfig } from "../../common/config/service-config";
     credentials: false,
   },
 })
-export class ClaimGateway implements OnGatewayConnection {
+export class ClaimGateway implements OnGatewayInit, OnGatewayConnection {
   @WebSocketServer()
   server!: Server;
 
@@ -38,6 +39,32 @@ export class ClaimGateway implements OnGatewayConnection {
     private readonly claimService: ClaimService,
     private readonly jwtTokenService: JwtTokenService,
   ) {}
+
+  afterInit(server: Server): void {
+    server.use(async (client, next) => {
+      try {
+        const token = this.extractToken(client);
+        const verified = await this.jwtTokenService.verifyToken(token);
+
+        client.data.identityId = verified.userId;
+        client.data.role = verified.role;
+        client.data.tokenId = verified.tokenId;
+
+        next();
+      } catch {
+        const error = new Error("Unauthorized");
+        (
+          error as Error & {
+            data?: { code: string };
+          }
+        ).data = {
+          code: "UNAUTHORIZED",
+        };
+
+        next(error);
+      }
+    });
+  }
 
   async handleConnection(client: Socket): Promise<void> {
     const tracer = trace.getTracer("claim-websocket");
@@ -48,13 +75,11 @@ export class ClaimGateway implements OnGatewayConnection {
       span.setAttribute("network.peer.address", client.handshake.address);
 
       try {
-        const token = this.extractToken(client);
-        const verified = await this.jwtTokenService.verifyToken(token);
+        const identityId = this.getIdentityId(client);
+        const role = this.getRole(client);
 
-        client.data.identityId = verified.userId;
-        client.data.role = verified.role;
-        span.setAttribute("enduser.id", verified.userId);
-        span.setAttribute("enduser.role", verified.role);
+        span.setAttribute("enduser.id", identityId);
+        span.setAttribute("enduser.role", role);
         span.setStatus({ code: SpanStatusCode.OK });
       } catch (error) {
         span.recordException(
@@ -62,7 +87,7 @@ export class ClaimGateway implements OnGatewayConnection {
         );
         span.setStatus({
           code: SpanStatusCode.ERROR,
-          message: "WebSocket authentication failed",
+          message: "WebSocket authentication state missing",
         });
         client.disconnect(true);
       } finally {
@@ -160,10 +185,22 @@ export class ClaimGateway implements OnGatewayConnection {
     }
 
     if (token.startsWith("Bearer ")) {
-      return token.slice(7).trim();
+      const bearerToken = token.slice(7).trim();
+
+      if (!bearerToken) {
+        throw new WsException("Missing authorization token");
+      }
+
+      return bearerToken;
     }
 
-    return token.trim();
+    const trimmedToken = token.trim();
+
+    if (!trimmedToken) {
+      throw new WsException("Missing authorization token");
+    }
+
+    return trimmedToken;
   }
 
   private getIdentityId(client: Socket): string {
@@ -174,5 +211,15 @@ export class ClaimGateway implements OnGatewayConnection {
     }
 
     return identityId;
+  }
+
+  private getRole(client: Socket): "USER" | "ADMIN" {
+    const role = client.data.role;
+
+    if (role !== "USER" && role !== "ADMIN") {
+      throw new WsException("Unauthorized");
+    }
+
+    return role;
   }
 }
