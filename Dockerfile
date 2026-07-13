@@ -34,11 +34,13 @@ RUN apt-get update \
 
 ENV NODE_ENV=production
 
-COPY --from=production-dependencies /app/node_modules ./node_modules
-COPY --from=production-dependencies /app/package.json ./package.json
-COPY --from=production-dependencies /app/package-lock.json ./package-lock.json
-COPY --from=production-dependencies /app/prisma ./prisma
-COPY --from=build /app/dist ./dist
+COPY --chown=node:node --from=production-dependencies /app/node_modules ./node_modules
+COPY --chown=node:node --from=production-dependencies /app/package.json ./package.json
+COPY --chown=node:node --from=production-dependencies /app/package-lock.json ./package-lock.json
+COPY --chown=node:node --from=production-dependencies /app/prisma ./prisma
+COPY --chown=node:node --from=build /app/dist ./dist
+
+USER node
 
 EXPOSE 8083
 
