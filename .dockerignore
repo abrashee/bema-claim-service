@@ -1,0 +1,30 @@
+# Dependencies and generated output
+node_modules
+dist
+coverage
+.nyc_output
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Version control and editor files
+.git
+.gitignore
+.DS_Store
+.idea
+.vscode
+
+# Tests and local reports not required by the image build
+test
+test-results
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Project documentation and development configuration
+README.md
+LICENSE
+eslint.config.mjs
