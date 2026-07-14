@@ -1,4 +1,11 @@
-FROM node:20-bullseye AS build
+FROM node:20-bullseye-slim AS base
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+
+FROM base AS build
 
 WORKDIR /app
 
@@ -13,7 +20,7 @@ RUN npx prisma generate
 RUN npm run build
 
 
-FROM node:20-bullseye AS production-dependencies
+FROM base AS production-dependencies
 
 WORKDIR /app
 
@@ -24,13 +31,9 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 
-FROM node:20-bullseye AS runtime
+FROM base AS runtime
 
 WORKDIR /app
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl \
-    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 
