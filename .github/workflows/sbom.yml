@@ -1,0 +1,39 @@
+name: Container SBOM
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - Dockerfile
+      - package.json
+      - package-lock.json
+      - src/**
+      - prisma/**
+      - .github/workflows/sbom.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-sbom:
+    name: Generate Claim Runtime SBOM
+    uses: abrashee/bema-infrastructure/.github/workflows/reusable-container-sbom.yml@dev
+    with:
+      repository: abrashee/bema-claim-service
+      ref: ${{ github.sha }}
+      image-name: bema-claim-service
+      artifact-name: claim-runtime
+      target: runtime
+
+  migrations-sbom:
+    name: Generate Claim Migrations SBOM
+    uses: abrashee/bema-infrastructure/.github/workflows/reusable-container-sbom.yml@dev
+    with:
+      repository: abrashee/bema-claim-service
+      ref: ${{ github.sha }}
+      image-name: bema-claim-migrations
+      artifact-name: claim-migrations
+      target: migrations
