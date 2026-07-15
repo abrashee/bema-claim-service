@@ -106,8 +106,8 @@ export function loadClaimServiceConfig(): ClaimServiceConfig {
     jwtSecret: parseRequiredString("JWT_SECRET", 32),
     requestBodyLimit: process.env.REQUEST_BODY_LIMIT?.trim() || "64kb",
     websocketOrigin: parseOrigin(
-      process.env.WEBSOCKET_ORIGIN,
-      "http://localhost:4200",
+      parseRequiredString("WEBSOCKET_ORIGIN"),
+      "",
     ),
     redisHost: parseRequiredString("REDIS_HOST"),
     redisPort: parsePositiveInt("REDIS_PORT"),
@@ -121,9 +121,9 @@ export function loadClaimServiceConfig(): ClaimServiceConfig {
       "CLAIM_QUEUE_BACKPRESSURE_LIMIT",
       1000,
     ),
-    otlpTraceEndpoint:
-      process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim() ||
-      "http://localhost:4318/v1/traces",
+    otlpTraceEndpoint: parseRequiredString(
+      "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    ),
     userServiceUrl:
       process.env.USER_SERVICE_URL?.trim() || "http://user-service:8081",
   };

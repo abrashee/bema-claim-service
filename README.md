@@ -2,18 +2,27 @@
 
 NestJS claim-processing service.
 
-## Required environment variables
+## Environment variables
+
+Required:
+
+- `DATABASE_URL` - PostgreSQL connection string used by Prisma
+- `JWT_SECRET` - minimum 32 characters, shared with `identity-service`
+- `REDIS_HOST` - queue, idempotency and rate-limit backend host
+- `REDIS_PORT` - queue, idempotency and rate-limit backend port
+- `WEBSOCKET_ORIGIN` - explicit allowed Socket.IO browser origin
+- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` - explicit OTLP/HTTP trace endpoint
+
+Optional:
 
 - `PORT` - HTTP listen port, defaults to `8083`
-- `NODE_ENV` - `development` or `production`
-- `JWT_SECRET` - minimum 32 characters, shared with `identity-service`
-- `REDIS_HOST` / `REDIS_PORT` - queue and rate-limit backend
-- `WEBSOCKET_ORIGIN` - allowed browser origin for Socket.IO
+- `NODE_ENV` - runtime environment, defaults to `production`
 - `REQUEST_BODY_LIMIT` - JSON body limit, defaults to `64kb`
-- `CLAIM_CREATE_RATE_LIMIT` / `CLAIM_CREATE_RATE_WINDOW_MS` - write throttle
-- `CLAIM_QUEUE_BACKPRESSURE_LIMIT` - fail closed when queue is overloaded
-- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` - OTLP trace endpoint
-- `USER_SERVICE_URL` - downstream user service base URL
+- `REDIS_CONNECT_TIMEOUT_MS` - Redis connection timeout, defaults to `2000`
+- `CLAIM_CREATE_RATE_LIMIT` - claim creation limit per window, defaults to `10`
+- `CLAIM_CREATE_RATE_WINDOW_MS` - claim-rate window, defaults to `60000`
+- `CLAIM_QUEUE_BACKPRESSURE_LIMIT` - queue overload threshold, defaults to `1000`
+- `USER_SERVICE_URL` - downstream user-service base URL, defaults to `http://user-service:8081`
 
 ## Endpoints
 

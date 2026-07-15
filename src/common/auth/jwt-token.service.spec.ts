@@ -25,6 +25,8 @@ describe("JwtTokenService", () => {
     process.env.REQUEST_BODY_LIMIT = "64kb";
     process.env.WEBSOCKET_ORIGIN = "http://localhost:4200";
     process.env.USER_SERVICE_URL = "http://user-service:8081";
+    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT =
+      "http://otel-collector:4318/v1/traces";
     resetClaimServiceConfig();
   });
 

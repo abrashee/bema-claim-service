@@ -15,6 +15,8 @@ describe("ClaimServiceConfig CORS", () => {
       REDIS_HOST: "redis",
       REDIS_PORT: "6379",
       WEBSOCKET_ORIGIN: "https://app.example.test",
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:
+        "http://otel-collector:4318/v1/traces",
     };
   });
 
@@ -26,6 +28,22 @@ describe("ClaimServiceConfig CORS", () => {
   it("uses the configured WebSocket origin", () => {
     expect(loadClaimServiceConfig().websocketOrigin)
       .toBe("https://app.example.test");
+  });
+
+  it("requires an explicit WebSocket origin", () => {
+    delete process.env.WEBSOCKET_ORIGIN;
+
+    expect(() => loadClaimServiceConfig()).toThrow(
+      "Missing required environment variable: WEBSOCKET_ORIGIN",
+    );
+  });
+
+  it("requires an explicit OTLP trace endpoint", () => {
+    delete process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT;
+
+    expect(() => loadClaimServiceConfig()).toThrow(
+      "Missing required environment variable: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    );
   });
 
   it("rejects a wildcard WebSocket origin", () => {
