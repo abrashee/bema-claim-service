@@ -3,7 +3,7 @@ export interface ClaimServiceConfig {
   nodeEnv: string;
   jwtSecret: string;
   requestBodyLimit: string;
-  websocketOrigin: string;
+  websocketOrigins: string[];
   redisHost: string;
   redisPort: number;
   redisConnectTimeoutMs: number;
@@ -67,36 +67,47 @@ function parseRequiredString(name: string, minimumLength?: number): string {
   return value;
 }
 
-function parseOrigin(value: string | undefined, fallback: string): string {
-  const origin = value?.trim() || fallback;
+function parseOrigins(value: string): string[] {
+  const origins = value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
-  if (origin === "*") {
-    throw new Error("CORS origin must not be a wildcard");
+  if (origins.length === 0) {
+    throw new Error("At least one WebSocket origin is required");
   }
 
-  let parsed: URL;
+  return origins.map((origin) => {
+    if (origin === "*") {
+      throw new Error("CORS origin must not be a wildcard");
+    }
 
-  try {
-    parsed = new URL(origin);
-  } catch {
-    throw new Error("CORS origin must be a valid HTTP or HTTPS origin");
-  }
+    let parsed: URL;
 
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("CORS origin must use HTTP or HTTPS");
-  }
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw new Error("CORS origin must be a valid HTTP or HTTPS origin");
+    }
 
-  if (
-    parsed.username ||
-    parsed.password ||
-    parsed.pathname !== "/" ||
-    parsed.search ||
-    parsed.hash
-  ) {
-    throw new Error("CORS origin must not contain credentials, a path, query, or fragment");
-  }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("CORS origin must use HTTP or HTTPS");
+    }
 
-  return parsed.origin;
+    if (
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      throw new Error(
+        "CORS origin must not contain credentials, a path, query, or fragment",
+      );
+    }
+
+    return parsed.origin;
+  });
 }
 
 export function loadClaimServiceConfig(): ClaimServiceConfig {
@@ -105,10 +116,7 @@ export function loadClaimServiceConfig(): ClaimServiceConfig {
     nodeEnv: process.env.NODE_ENV?.trim() || "production",
     jwtSecret: parseRequiredString("JWT_SECRET", 32),
     requestBodyLimit: process.env.REQUEST_BODY_LIMIT?.trim() || "64kb",
-    websocketOrigin: parseOrigin(
-      parseRequiredString("WEBSOCKET_ORIGIN"),
-      "",
-    ),
+    websocketOrigins: parseOrigins(parseRequiredString("WEBSOCKET_ORIGIN")),
     redisHost: parseRequiredString("REDIS_HOST"),
     redisPort: parsePositiveInt("REDIS_PORT"),
     redisConnectTimeoutMs: parseOptionalInt("REDIS_CONNECT_TIMEOUT_MS", 2000),
@@ -148,7 +156,7 @@ export function isAllowedWebSocketOrigin(
     return false;
   }
 
-  return requestOrigin === getClaimServiceConfig().websocketOrigin;
+  return getClaimServiceConfig().websocketOrigins.includes(requestOrigin);
 }
 
 export function resetClaimServiceConfig(): void {

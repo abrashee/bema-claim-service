@@ -26,8 +26,9 @@ describe("ClaimServiceConfig CORS", () => {
   });
 
   it("uses the configured WebSocket origin", () => {
-    expect(loadClaimServiceConfig().websocketOrigin)
-      .toBe("https://app.example.test");
+    expect(loadClaimServiceConfig().websocketOrigins).toEqual([
+      "https://app.example.test",
+    ]);
   });
 
   it("requires an explicit WebSocket origin", () => {
@@ -49,15 +50,17 @@ describe("ClaimServiceConfig CORS", () => {
   it("rejects a wildcard WebSocket origin", () => {
     process.env.WEBSOCKET_ORIGIN = "*";
 
-    expect(() => loadClaimServiceConfig())
-      .toThrow("CORS origin must not be a wildcard");
+    expect(() => loadClaimServiceConfig()).toThrow(
+      "CORS origin must not be a wildcard",
+    );
   });
 
   it("normalizes a configured origin", () => {
     process.env.WEBSOCKET_ORIGIN = "https://app.example.test/";
 
-    expect(loadClaimServiceConfig().websocketOrigin)
-      .toBe("https://app.example.test");
+    expect(loadClaimServiceConfig().websocketOrigins).toEqual([
+      "https://app.example.test",
+    ]);
   });
 
   it.each([
@@ -76,13 +79,11 @@ describe("ClaimServiceConfig CORS", () => {
   it("accepts only the configured WebSocket request origin", () => {
     loadClaimServiceConfig();
 
-    expect(
-      isAllowedWebSocketOrigin("https://app.example.test"),
-    ).toBe(true);
+    expect(isAllowedWebSocketOrigin("https://app.example.test")).toBe(true);
 
-    expect(
-      isAllowedWebSocketOrigin("https://attacker.example.test"),
-    ).toBe(false);
+    expect(isAllowedWebSocketOrigin("https://attacker.example.test")).toBe(
+      false,
+    );
 
     expect(isAllowedWebSocketOrigin(undefined)).toBe(false);
     expect(isAllowedWebSocketOrigin("")).toBe(false);
