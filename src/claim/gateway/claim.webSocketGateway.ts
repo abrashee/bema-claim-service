@@ -30,7 +30,9 @@ import {
 
 @WebSocketGateway({
   cors: {
-    origin: getClaimServiceConfig().websocketOrigin,
+    origin: (origin, callback) => {
+      callback(null, isAllowedWebSocketOrigin(origin));
+    },
     credentials: false,
   },
   allowRequest: (request, callback) => {
