@@ -39,12 +39,21 @@ describe("ClaimServiceConfig CORS", () => {
     );
   });
 
-  it("requires an explicit OTLP trace endpoint", () => {
+    it("allows OTEL to be disabled without an OTLP trace endpoint", () => {
     delete process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT;
 
-    expect(() => loadClaimServiceConfig()).toThrow(
-      "Missing required environment variable: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-    );
+    expect(loadClaimServiceConfig().otelEnabled).toBe(false);
+    expect(loadClaimServiceConfig().otlpTraceEndpoint).toBeUndefined();
+  });
+
+  it("allows OTEL to be enabled only when tracing config is provided", () => {
+    process.env.ENABLE_OTEL = "true";
+    delete process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT;
+
+    const config = loadClaimServiceConfig();
+
+    expect(config.otelEnabled).toBe(true);
+    expect(config.otlpTraceEndpoint).toBeUndefined();
   });
 
   it("rejects a wildcard WebSocket origin", () => {

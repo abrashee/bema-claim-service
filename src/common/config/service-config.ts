@@ -10,7 +10,8 @@ export interface ClaimServiceConfig {
   createClaimRateLimit: number;
   createClaimRateWindowMs: number;
   queueBackpressureLimit: number;
-  otlpTraceEndpoint: string;
+  otelEnabled: boolean;
+  otlpTraceEndpoint?: string;
   userServiceUrl: string;
 }
 
@@ -65,6 +66,17 @@ function parseRequiredString(name: string, minimumLength?: number): string {
   }
 
   return value;
+}
+
+
+function parseBoolean(name: string, fallback = false): boolean {
+  const value = process.env[name]?.trim().toLowerCase();
+
+  if (!value) {
+    return fallback;
+  }
+
+  return value === "true";
 }
 
 function parseOrigins(value: string): string[] {
@@ -129,9 +141,9 @@ export function loadClaimServiceConfig(): ClaimServiceConfig {
       "CLAIM_QUEUE_BACKPRESSURE_LIMIT",
       1000,
     ),
-    otlpTraceEndpoint: parseRequiredString(
-      "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-    ),
+    otelEnabled: parseBoolean("ENABLE_OTEL", false),
+    otlpTraceEndpoint:
+      process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim(),
     userServiceUrl:
       process.env.USER_SERVICE_URL?.trim() || "http://user-service:8081",
   };

@@ -13,6 +13,16 @@ export function startTracing() {
 
   const config = getClaimServiceConfig();
 
+  if (!config.otelEnabled) {
+    return;
+  }
+
+  if (!config.otlpTraceEndpoint) {
+    throw new Error(
+      "ENABLE_OTEL=true requires OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    );
+  }
+
   sdk = new NodeSDK({
     serviceName: "bema-claim-service",
     traceExporter: new OTLPTraceExporter({
